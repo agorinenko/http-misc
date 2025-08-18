@@ -31,7 +31,7 @@ def join_str(*args, sep: str | None = '/', append_last_sep: bool | None = False)
     return url
 
 
-async def send_and_validate(service: services.BaseService, request, expected_status: int | None = 200):
+async def send_and_validate(service: 'services.BaseService', request, expected_status: int | None = 200):
     """ Вызов внешнего сервиса и проверка его статуса"""
     response = await service.send_request(**request)
     if response.status != expected_status:
