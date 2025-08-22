@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='http-misc',
-    version='0.0.2',
+    version='1.0.1',
     author='Anton Gorinenko',
     author_email='anton.gorinenko@gmail.com',
     description='Утилитарный пакет межсервисного взаимодействия по протоколу HTTP',
@@ -28,7 +28,9 @@ setuptools.setup(
             'pytest',
             'python-dotenv',
             'envparse',
-            'pytest-asyncio'
+            'pytest-asyncio',
+            'pytest-mock',
+            'pytest-env'
         ]
     },
     python_requires='>=3.10',
