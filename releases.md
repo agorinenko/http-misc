@@ -1,3 +1,7 @@
+# http-misc 1.0.2 release notes
+
+1. Исправлена ошибка вызова HttpService
+
 # http-misc 1.0.1 release notes
 
 1. Изменен и доработан подход к политикам повторных вызовов
