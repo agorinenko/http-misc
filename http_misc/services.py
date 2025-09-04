@@ -1,4 +1,3 @@
-import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -99,7 +98,7 @@ class HttpService(BaseService):
         super().__init__(*args, **kwargs)
         self.client_session = client_session
 
-    async def _send(self, request_id: uuid.UUID, *args, **kwargs) -> ServiceResponse:
+    async def _send(self, *args, **kwargs) -> ServiceResponse:
         method = kwargs.get('method', 'get')
         url = kwargs.get('url', None)
         if url is None:
