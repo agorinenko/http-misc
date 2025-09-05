@@ -1,3 +1,8 @@
+# http-misc 1.0.3 release notes
+
+1. Разработан SetSystemOAuthToken трансформер, который указывает Bearer token для учетных записей автоматизации
+2. Разработан SetBasicAuthorization трансформер, который указывает Basic token
+
 # http-misc 1.0.2 release notes
 
 1. Исправлена ошибка вызова HttpService
