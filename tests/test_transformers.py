@@ -23,7 +23,7 @@ async def test_set_system_oauth_token(mocker):
         client_id='6x7ujMdws6tDLbpePzQZvkYd0yFADYNJ11putMRw',
         client_secret='RgCUfgtFHxqZ2amnqS4eTFL6cRsdfc3YYN0lTBrAIarLrt0Icewv6QzC1nFZXusEjqpG0aFmC14f8Jme4z3Q4TpxI9UQM5aU5LQkvuKpOoZ3oF2wDlyC7J41zPGTYuhO',
         scope='read write',
-        token_url='http://iam.dev.zaobe.cloud:8008/api/v1/oauth/token/',
+        token_url='http://localhost/api/v1/oauth/token/',
         token_cache=cache.MemoryTokenCache())
 
     request = {
