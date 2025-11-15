@@ -4,7 +4,7 @@ from abc import abstractmethod, ABC
 
 class TokenCache(ABC):
     @abstractmethod
-    def set_token(self, cache_key: str, access_token: str, expires_in: datetime):
+    def set_token(self, cache_key: str, access_token: str, expires_in: datetime.datetime):
         pass
 
     @abstractmethod
@@ -17,9 +17,16 @@ class TokenCache(ABC):
 
 
 class MemoryTokenCache(TokenCache):
-    """ Класс, реализующий хранение access_token в памяти """
+    """ Класс, реализующий хранение access_token в памяти.
+    Обратите внимание, что если ключом является client_id, то memory_cache не может быть одним на все запросы,
+    тк у разных запросов могут быть разные разрешения scopes
+    """
 
-    def set_token(self, cache_key: str, access_token: str, expires_in: datetime):
+    # memory_cache = {}
+    def __init__(self):
+        self.memory_cache = {}
+
+    def set_token(self, cache_key: str, access_token: str, expires_in: datetime.datetime):
         """ Установка токенов """
         cache_value = {'access_token': access_token, 'expires_in': expires_in}
 
@@ -34,5 +41,3 @@ class MemoryTokenCache(TokenCache):
     def remove(self, cache_key: str):
         if cache_key in self.memory_cache:
             self.memory_cache.pop(cache_key)
-
-    memory_cache = {}
