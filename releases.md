@@ -1,3 +1,12 @@
+# http-misc 1.0.5 release notes
+
+1. Добавлена возможность указывать пользовательские токены в сервисах, а не переопределять их при указании параметра
+   force_token_update=False при работе с наследниками TokenTransformer
+
+# http-misc 1.0.4 release notes
+
+1. Исправлена ошибка глобального хранения MemoryTokenCache
+
 # http-misc 1.0.3 release notes
 
 1. Разработан SetSystemOAuthToken трансформер, который указывает Bearer token для учетных записей автоматизации

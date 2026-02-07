@@ -10,17 +10,21 @@ from http_misc.services import Transformer
 
 
 class TokenTransformer(Transformer, ABC):
+    def __init__(self, force_token_update: bool | None = False):
+        self.force_token_update = force_token_update
 
     @abstractmethod
     async def get_token(self, *args, **kwargs):
-        pass
+        raise NotImplementedError('get_token')
 
     @abstractmethod
     async def get_token_name(self, *args, **kwargs):
-        pass
+        raise NotImplementedError('get_token_name')
 
     async def modify(self, *args, **kwargs):
         headers = kwargs.setdefault('cfg', {}).setdefault('headers', {})
+        if not self.force_token_update and 'Authorization' in headers and headers['Authorization']:
+            return args, kwargs
         token = await self.get_token(*args, **kwargs)
         token_name = await self.get_token_name(*args, **kwargs)
         headers['Authorization'] = f'{token_name} {token}'
@@ -37,7 +41,8 @@ class SetBasicAuthorization(TokenTransformer):
     async def get_token(self, *args, **kwargs):
         return base64.b64encode(self.client_id + b':' + self.client_secret).decode('utf-8')
 
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(self, client_id: str, client_secret: str, *arg, **kwargs):
+        super().__init__(*arg, **kwargs)
         self.client_id = client_id.encode('utf-8')
         self.client_secret = client_secret.encode('utf-8')
 
@@ -49,7 +54,9 @@ class SetSystemOAuthToken(TokenTransformer):
         return 'Bearer'
 
     def __init__(self, client_id: str, client_secret: str, scope: str,
-                 token_url: str, token_cache: TokenCache | None = None, use_utc: bool | None = True):
+                 token_url: str, *arg, token_cache: TokenCache | None = None,
+                 use_utc: bool | None = True, **kwargs):
+        super().__init__(*arg, **kwargs)
         self.token_cache = token_cache
         self.client_id = client_id
         self.client_secret = client_secret
