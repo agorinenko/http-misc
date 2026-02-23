@@ -45,3 +45,23 @@ async def send_and_validate(service: 'services.BaseService', request, expected_s
                                       status_code=response.status, response=response.response_data)
 
     return response.response_data
+
+
+def filter_list_by_key(filter_data: list, id_key: str, key_value,
+                       find_first: bool | None = True,
+                       raise_if_not_found: bool | None = False) -> list | dict:
+    """ Фильтрация списка словарей по ключевому полю """
+    if not isinstance(filter_data, list):
+        raise KeyError('Invalid filter data - expected list.')
+
+    if not isinstance(key_value, str):
+        key_value = str(key_value)
+
+    data_filter = filter(lambda x: str(x[id_key]) == key_value, filter_data)
+    if find_first:
+        data = next(data_filter, None)
+        if data is None and raise_if_not_found:
+            raise KeyError(f'Item with field {id_key} not found for key value {key_value}')
+        return data
+
+    return list(data_filter)
