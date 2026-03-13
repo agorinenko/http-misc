@@ -9,6 +9,10 @@ class MaxRetryError(Exception):
     Превышено максимальное число повторов
     """
 
+class TokenParseError(Exception):
+    """
+    Ошибка разбора токена
+    """
 
 class InteractionError(Exception):
     """ Ошибки взаимодействия с внешним сервисом """

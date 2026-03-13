@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='http-misc',
-    version='1.0.6',
+    version='1.0.7',
     author='Anton Gorinenko',
     author_email='anton.gorinenko@gmail.com',
     description='Утилитарный пакет межсервисного взаимодействия по протоколу HTTP',
@@ -22,6 +22,7 @@ setuptools.setup(
     # TODO: Убрать версии
     install_requires=[
         'aiohttp',
+        'PyJWT'
     ],
     extras_require={
         'test': [
@@ -31,7 +32,8 @@ setuptools.setup(
             'pytest-asyncio',
             'pytest-mock',
             'pytest-env',
-            'freezegun'
+            'freezegun',
+            'asgiref'
         ]
     },
     python_requires='>=3.10',

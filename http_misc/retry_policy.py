@@ -2,7 +2,7 @@ import asyncio
 import random
 import uuid
 from abc import ABC
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from time import sleep
 
 from http_misc.errors import RetryError, MaxRetryError
@@ -16,7 +16,10 @@ class BaseRetryPolicy(ABC):
     Базовая политика действий
     """
 
-    def __init__(self, max_retry: int | None = 9, backoff_factor: float | None = 0.3, jitter: float | None = 0.1):
+    def __init__(self, max_retry: int | None = 9,
+                 backoff_factor: float | None = 0.3,
+                 jitter: float | None = 0.1,
+                 retry_on_exceptions: Iterable[type[Exception]] | None = None):
         """ Базовая политика действий
         :param max_retry: максимальное количество повторений(без учета основного вызова)
         :param backoff_factor: коэффициент задержки попыток повторных вызовов
@@ -25,6 +28,10 @@ class BaseRetryPolicy(ABC):
         self.max_retry = max_retry
         self.backoff_factor = backoff_factor
         self.jitter = jitter
+        _retry_on_exceptions: list[type[Exception]] = [RetryError]
+        if retry_on_exceptions:
+            _retry_on_exceptions.extend(retry_on_exceptions)
+        self.retry_on_exceptions = tuple(_retry_on_exceptions)
 
         self.request_count_manager = RequestCountManager()
 
@@ -53,7 +60,7 @@ class AsyncRetryPolicy(BaseRetryPolicy):
                     logger.debug('Step %s. Repeat action #%s.', request_id)
                 try:
                     return await action(*args, **kwargs)
-                except RetryError:
+                except self.retry_on_exceptions as ex:
                     sleep_seconds = self._on_retry_error(current_step, request_id)
                     await asyncio.sleep(sleep_seconds)
         finally:
@@ -75,7 +82,7 @@ class RetryPolicy(BaseRetryPolicy):
                     logger.debug('Step %s. Repeat action #%s.', request_id)
                 try:
                     return action(*args, **kwargs)
-                except RetryError:
+                except self.retry_on_exceptions as ex:
                     sleep_seconds = self._on_retry_error(current_step, request_id)
                     sleep(sleep_seconds)
         finally:
