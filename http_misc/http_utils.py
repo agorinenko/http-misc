@@ -4,6 +4,9 @@ import json
 import uuid
 from typing import Optional
 
+import jwt
+from jwt import ExpiredSignatureError, InvalidTokenError
+
 from http_misc import services, errors, retry_policy
 
 
@@ -65,3 +68,48 @@ def filter_list_by_key(filter_data: list, id_key: str, key_value,
         return data
 
     return list(data_filter)
+
+
+def parse_authorization_header(authorization_header: str) -> tuple[str, str]:
+    """
+    Парсинг значения заголовка Authorization
+    Authorization: Bearer 401f7ac837da42b97f613d789819ff93537bee6a
+    """
+    if not authorization_header:
+        raise errors.TokenParseError('Заголовок AUTHORIZATION не указан или его значение отсутствует.')
+
+    auth = authorization_header.split()
+
+    len_auth = len(auth)
+
+    if len_auth == 0:
+        raise errors.TokenParseError('Не верный заголовок AUTHORIZATION: значение должно содержать пробелы.')
+
+    if len_auth == 1:
+        raise errors.TokenParseError(
+            'Не верный заголовок AUTHORIZATION: не указан один из реквизитов для входа.')
+
+    if len_auth > 2:
+        raise errors.TokenParseError('Не верный заголовок AUTHORIZATION: реквизитов для входа больше чем 2.')
+
+    return auth[0], auth[1]
+
+
+def token_is_valid(authorization_header: str, use_utc: bool | None = True) -> bool:
+    """
+    Проверка времени жизни токена. True - токен еще действителен.
+    """
+    token_name, token = parse_authorization_header(authorization_header)
+
+    if token_name.lower() == 'bearer':
+        try:
+            decoded = jwt.decode(token, options={'verify_signature': False})
+            exp = decoded.get('exp')
+            if exp:
+                now = datetime.datetime.now(tz=datetime.timezone.utc if use_utc else None)
+                current_time = now.timestamp()
+                return current_time < exp
+        except (ExpiredSignatureError, InvalidTokenError, jwt.DecodeError):
+            return False
+
+    return True

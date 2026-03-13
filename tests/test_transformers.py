@@ -42,6 +42,7 @@ async def test_set_system_oauth_token(mocker):
     token_1 = request['cfg']['headers']['Authorization']
     assert token_1 == 'Bearer nb0G0HyVooN5XbSBaN2uYUr6pW75wh'
     # Протух
+    transformer.force_token_update = True
     with freeze_time('2025-01-16 12:00:01'):
         await transformer.modify(**request)
         token_2 = request['cfg']['headers']['Authorization']

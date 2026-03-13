@@ -1,3 +1,8 @@
+# http-misc 1.0.7 release notes
+
+1. Добавлена возможность указания ошибок, для которых происходит повторный retry у RetryPolicy и AsyncRetryPolicy.
+2. Добавлены утилитарные функции parse_authorization_header и token_is_valid
+
 # http-misc 1.0.6 release notes
 
 1. Добавлены общие утилитарные функции тестирования

@@ -54,17 +54,17 @@ class SetSystemOAuthToken(TokenTransformer):
         return 'Bearer'
 
     def __init__(self, client_id: str, client_secret: str, scope: str,
-                 token_url: str, *arg, token_cache: TokenCache | None = None,
-                 use_utc: bool | None = True, **kwargs):
+                 token_url: str, *arg, token_cache: TokenCache | None = None, use_utc: bool | None = True,
+                 **kwargs):
         super().__init__(*arg, **kwargs)
         self.token_cache = token_cache
         self.client_id = client_id
         self.client_secret = client_secret
         self.token_url = token_url
         self.scope = scope
+        self.use_utc = use_utc
         self._service = services.HttpService()
         self._policy = retry_policy.AsyncRetryPolicy()
-        self.use_utc = use_utc
 
     def _init_token_request(self):
         form = aiohttp.FormData(quote_fields=True)
