@@ -1,3 +1,11 @@
+# http-misc 2.0.1 release notes
+
+1. Добавлен базовый класс OAuthTokenTransformer
+2. Доработан трансформер SetSystemOAuthToken для использования его в качестве базового класса
+3. Реализован трансформер SetUserOAuthToken, который указывает Bearer token для пользовательских учетных записей
+4. Изменен подход к кешированию данных: добавлены BaseCache и MemoryCache, убраны TokenCache и MemoryTokenCache 
+
+
 # http-misc 1.0.7 release notes
 
 1. Добавлена возможность указания ошибок, для которых происходит повторный retry у RetryPolicy и AsyncRetryPolicy.

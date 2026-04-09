@@ -1,11 +1,9 @@
 import base64
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, timezone
 
 import aiohttp
 
-from http_misc import services, http_utils, retry_policy
-from http_misc.cache import TokenCache
+from http_misc import services, http_utils, retry_policy, cache
 from http_misc.services import Transformer
 
 
@@ -15,19 +13,22 @@ class TokenTransformer(Transformer, ABC):
 
     @abstractmethod
     async def get_token(self, *args, **kwargs):
+        """ Получение токена """
         raise NotImplementedError('get_token')
 
+    @property
     @abstractmethod
-    async def get_token_name(self, *args, **kwargs):
-        raise NotImplementedError('get_token_name')
+    def token_name(self):
+        """ Наименование токена """
+        raise NotImplementedError('token_name')
 
     async def modify(self, *args, **kwargs):
+        """ Применение токена в заголовке Authorization """
         headers = kwargs.setdefault('cfg', {}).setdefault('headers', {})
         if not self.force_token_update and 'Authorization' in headers and headers['Authorization']:
             return args, kwargs
         token = await self.get_token(*args, **kwargs)
-        token_name = await self.get_token_name(*args, **kwargs)
-        headers['Authorization'] = f'{token_name} {token}'
+        headers['Authorization'] = f'{self.token_name} {token}'
 
         return args, kwargs
 
@@ -35,7 +36,8 @@ class TokenTransformer(Transformer, ABC):
 class SetBasicAuthorization(TokenTransformer):
     """ Указывает Basic token """
 
-    async def get_token_name(self, *args, **kwargs):
+    @property
+    def token_name(self):
         return 'Basic'
 
     async def get_token(self, *args, **kwargs):
@@ -47,31 +49,64 @@ class SetBasicAuthorization(TokenTransformer):
         self.client_secret = client_secret.encode('utf-8')
 
 
-class SetSystemOAuthToken(TokenTransformer):
-    """ Указывает Bearer token учетных записей для автоматизации """
+class OAuthTokenTransformer(TokenTransformer, ABC):
+    """ Базовый класс, отвечающий за получение и обновление токена у OAuth провайдера """
 
-    async def get_token_name(self, *args, **kwargs):
+    @property
+    def token_name(self):
         return 'Bearer'
 
-    def __init__(self, client_id: str, client_secret: str, scope: str,
-                 token_url: str, *arg, token_cache: TokenCache | None = None, use_utc: bool | None = True,
+    @property
+    @abstractmethod
+    def grant_type(self):
+        raise NotImplementedError('grant_type')
+
+    @property
+    def extended_token_request(self) -> dict:
+        return {}
+
+    def __init__(self, client_id: str, client_secret: str, scope: str, token_url: str, *args,
+                 token_cache: cache.BaseCache | None = None,
+                 access_token_field: str | None = 'access_token',
+                 refresh_token_field: str | None = 'refresh_token',
+                 expires_in_field: str | None = 'expires_in',
                  **kwargs):
-        super().__init__(*arg, **kwargs)
+        """
+        Базовый класс, отвечающий за получение и обновление токена у OAuth провайдера
+        :param client_id: идентификатор клиента
+        :param client_secret: секретный ключ клиента
+        :param scope: разделенный пробелами список областей для приложений OAuth
+        :param token_url: конечная точка получения токенов
+        :param arg: прочие аргументы
+        :param token_cache: реализация кеширования
+        :param access_token_field: поле ответа, в котором содержится access_token
+        :param expires_in_field: поле ответа, в котором содержится дата устаревания
+        :param kwargs: прочие именованные параметры
+        """
+        super().__init__(*args, **kwargs)
         self.token_cache = token_cache
         self.client_id = client_id
         self.client_secret = client_secret
         self.token_url = token_url
         self.scope = scope
-        self.use_utc = use_utc
+
+        self.access_token_field = access_token_field
+        self.refresh_token_field = refresh_token_field
+        self.expires_in_field = expires_in_field
+
         self._service = services.HttpService()
         self._policy = retry_policy.AsyncRetryPolicy()
 
     def _init_token_request(self):
         form = aiohttp.FormData(quote_fields=True)
-        form.add_field('grant_type', 'client_credentials')
+        form.add_field('grant_type', self.grant_type)
         form.add_field('client_id', self.client_id)
         form.add_field('client_secret', self.client_secret)
         form.add_field('scope', self.scope)
+
+        for key, value in self.extended_token_request.items():
+            form.add_field(key, value)
+
         request = {
             'method': 'POST',
             'url': self.token_url,
@@ -79,44 +114,75 @@ class SetSystemOAuthToken(TokenTransformer):
                 'data': form
             }
         }
+
         return request
 
-    def _parse_token_response(self, response: dict):
-        access_token = response.get('access_token')
-        expires_in = response.get('expires_in')
+    def _parse_token_response(self, response: dict) -> tuple[dict, float]:
+        access_token = response.get(self.access_token_field)
+        expires_in = response.get(self.expires_in_field)
+        refresh_token = response.get(self.refresh_token_field)
+
         if not access_token or not expires_in:
             raise ValueError('Invalid response - access_token or expires_in is none.')
 
-        return access_token, expires_in
+        return {
+            'access_token': access_token,
+            'expires_in': expires_in,
+            'refresh_token': refresh_token
+        }, float(expires_in) - 60  # делаем срок устаревания на 60 секунд меньше
 
-    def _now(self):
-        return datetime.now(tz=timezone.utc if self.use_utc else None)
-
-    async def _init_token(self) -> str:
+    async def _init_token(self) -> dict:
         request = self._init_token_request()
         response_data = await http_utils.send_and_validate(self._service, request, policy=self._policy)
-        access_token, expires_in = self._parse_token_response(response_data)
+        data, expires_in = self._parse_token_response(response_data)
         if self.token_cache:
-            expires_in = self._now() + timedelta(seconds=expires_in)
-            self.token_cache.set_token(self.client_id, access_token, expires_in)
-        return access_token
+            await self.token_cache.set(self.client_id, data, expired_timeout=expires_in)
 
-    async def _get_token(self) -> tuple[str | None, datetime | None]:
+        return data
+
+    async def _get_token_cache(self) -> dict | None:
+        """ Получение закешированного токена """
         if self.token_cache:
-            return self.token_cache.get_token(self.client_id)
+            return await self.token_cache.get(self.client_id)
 
-        return None, None
+        return None
 
     async def get_token(self, *args, **kwargs):
-        access_token, expires_in = await self._get_token()
-        # если токен найден
-        if access_token:
-            # проверяем срок жизни токена и если он истек получаем новый.
-            if self._now() < expires_in:
-                return access_token
+        """ Получение access_token """
+        data = await self._get_token_cache()
+        if data:
+            # если токен найден
+            # TODO: Не используется refresh token
+            return data['access_token']
 
-            # время жизни истекло, инициализируем токен
-            return await self._init_token()
-        else:
-            # если токен не найден, то инициализируем токены
-            return await self._init_token()
+        # если токен не найден, то инициализируем токены
+        data = await self._init_token()
+        return data['access_token']
+
+
+class SetSystemOAuthToken(OAuthTokenTransformer):
+    """ Указывает Bearer token учетных записей для автоматизации """
+
+    @property
+    def grant_type(self):
+        return 'client_credentials'
+
+
+class SetUserOAuthToken(OAuthTokenTransformer):
+    """ Указывает Bearer token для пользовательских учетных записей """
+
+    def __init__(self, username: str, password: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.username = username
+        self.password = password
+
+    @property
+    def grant_type(self):
+        return 'password'
+
+    @property
+    def extended_token_request(self) -> dict:
+        return {
+            'username': self.username,
+            'password': self.password
+        }

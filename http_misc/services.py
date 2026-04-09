@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from aiohttp import ContentTypeError, ClientSession
 
 from http_misc import http_utils, errors
 from http_misc.logger import get_logger
 
-DEFAULT_RETRY_ON_STATUSES = frozenset([413, 429, 503, 504])
+DEFAULT_RETRY_ON_STATUSES = frozenset([408, 429, 500, 502, 503, 504])
 logger = get_logger('services')
 
 
@@ -15,8 +16,8 @@ logger = get_logger('services')
 class ServiceResponse:
     """ Ответ сервиса """
     status: int
-    response_data: any = None
-    raw_response: any = None
+    response_data: Any = None
+    raw_response: Any = None
 
 
 class Transformer(ABC):
@@ -61,11 +62,11 @@ class BaseService(ABC):
                 raise errors.RetryError()
 
             return service_response
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             if isinstance(ex, errors.RetryError):
                 raise ex
-            else:
-                return await self._on_error(ex, *args, **kwargs)
+
+            return await self._on_error(ex, *args, **kwargs)
 
     async def _transform_response(self, response: ServiceResponse) -> ServiceResponse:
         """ Преобразование ответа для возврата пользователю """
@@ -81,7 +82,7 @@ class BaseService(ABC):
                 args, kwargs = await request_preproc.modify(*args, **kwargs)
         return args, kwargs
 
-    async def _on_error(self, ex: Exception, *args, **kwargs) -> ServiceResponse:
+    async def _on_error(self, ex: Exception, *args, **kwargs) -> ServiceResponse:  # pylint: disable=unused-argument
         """
         Действие на возникновение ошибки.
         """
