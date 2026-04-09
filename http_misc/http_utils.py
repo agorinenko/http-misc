@@ -1,3 +1,6 @@
+"""
+Утилитарные функции
+"""
 import datetime
 import decimal
 import json

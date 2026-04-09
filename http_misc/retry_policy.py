@@ -1,3 +1,6 @@
+"""
+Политика повторов
+"""
 import asyncio
 import random
 import uuid
@@ -60,7 +63,7 @@ class AsyncRetryPolicy(BaseRetryPolicy):
                     logger.debug('Step %s. Repeat action #%s.', request_id)
                 try:
                     return await action(*args, **kwargs)
-                except self.retry_on_exceptions as ex:
+                except self.retry_on_exceptions:
                     sleep_seconds = self._on_retry_error(current_step, request_id)
                     await asyncio.sleep(sleep_seconds)
         finally:
@@ -82,7 +85,7 @@ class RetryPolicy(BaseRetryPolicy):
                     logger.debug('Step %s. Repeat action #%s.', request_id)
                 try:
                     return action(*args, **kwargs)
-                except self.retry_on_exceptions as ex:
+                except self.retry_on_exceptions:
                     sleep_seconds = self._on_retry_error(current_step, request_id)
                     sleep(sleep_seconds)
         finally:

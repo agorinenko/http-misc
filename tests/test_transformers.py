@@ -1,9 +1,14 @@
+import pytest
 from freezegun import freeze_time
 
 from http_misc import transformers, cache
 
 
-async def test_set_system_oauth_token(mocker):
+@pytest.mark.parametrize('is_user', (
+        True,
+        False
+))
+async def test_set_system_oauth_token(mocker, is_user):
     send_and_validate_mocker = mocker.patch('http_misc.http_utils.send_and_validate')
     send_and_validate_mocker.side_effect = [
         {
@@ -19,12 +24,15 @@ async def test_set_system_oauth_token(mocker):
             "scope": "read write"
         }
     ]
-    transformer = transformers.SetSystemOAuthToken(
-        client_id='6x7ujMdws6tDLbpePzQZvkYd0yFADYNJ11putMRw',
-        client_secret='RgCUfgtFHxqZ2amnqS4eTFL6cRsdfc3YYN0lTBrAIarLrt0Icewv6QzC1nFZXusEjqpG0aFmC14f8Jme4z3Q4TpxI9UQM5aU5LQkvuKpOoZ3oF2wDlyC7J41zPGTYuhO',
-        scope='read write',
-        token_url='http://localhost/api/v1/oauth/token/',
-        token_cache=cache.MemoryTokenCache())
+    if is_user:
+        transformer = transformers.SetUserOAuthToken(
+            'user1', '123', 'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/',
+            token_cache=cache.MemoryCache()
+        )
+    else:
+        transformer = transformers.SetSystemOAuthToken(
+            'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/', token_cache=cache.MemoryCache()
+        )
 
     request = {
         'method': 'POST',

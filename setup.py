@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='http-misc',
-    version='1.0.7',
+    version='2.0.1',
     author='Anton Gorinenko',
     author_email='anton.gorinenko@gmail.com',
     description='Утилитарный пакет межсервисного взаимодействия по протоколу HTTP',
@@ -19,7 +19,6 @@ setuptools.setup(
         'Programming Language :: Python :: 3.13',
         'Operating System :: OS Independent',
     ],
-    # TODO: Убрать версии
     install_requires=[
         'aiohttp',
         'PyJWT'
