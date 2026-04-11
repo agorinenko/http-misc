@@ -1,6 +1,8 @@
 """
 Ошибки
 """
+
+# pylint: disable=cyclic-import
 class RetryError(Exception):
     """
     Ошибка, которая вызывает повторный вызов запроса

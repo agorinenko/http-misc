@@ -1,14 +1,65 @@
+import uuid
 from unittest.mock import call
 
+import aiohttp
+import httpx
 import pytest
-from http_misc import http_utils
+
+from http_misc import http_utils, transports, errors
+from http_misc.aiohttp.transports import AioHttpTransport
 
 from http_misc.errors import RetryError, MaxRetryError
+from http_misc.httpx.transports import HttpxTransport
 from http_misc.retry_policy import AsyncRetryPolicy
-from http_misc.services import HttpService, ServiceResponse
+from http_misc.services import HttpService
 
 
-async def test_http_service(mocker):
+@pytest.mark.integration
+@pytest.mark.parametrize('transport', (
+        None,
+        AioHttpTransport(),
+        HttpxTransport(),
+))
+@pytest.mark.parametrize('url', (
+        'https://jsonplaceholder.typicode.com/todos',
+        'https://gorinenko.ru/'
+))
+async def test_http_service_integration(transport, url):
+    policy = AsyncRetryPolicy()
+    service = HttpService(transport=transport)
+    request = {
+        'method': 'GET',
+        'url': url
+    }
+
+    result = await policy.apply(service.send_request, **request)
+    assert result.status == 200
+
+
+@pytest.mark.parametrize('transport', (
+        AioHttpTransport(),
+        HttpxTransport(),
+))
+async def test_http_service__dns_error(transport):
+    policy = AsyncRetryPolicy(ignore_exceptions=[
+        aiohttp.client_exceptions.ClientConnectorDNSError, httpx.ConnectError
+    ])
+    service = HttpService(transport=transport)
+    request = {
+        'method': 'GET',
+        'url': f'https://{uuid.uuid4()}.ru'
+    }
+
+    result = await policy.apply(service.send_request, **request)
+    assert result is None
+
+
+@pytest.mark.parametrize('transport', (
+        None,
+        AioHttpTransport(),
+        HttpxTransport(),
+))
+async def test_http_service(mocker, transport):
     response_data = {
         'meta': {
             'count': 5
@@ -18,10 +69,10 @@ async def test_http_service(mocker):
         ]
     }
     send_mocker = mocker.patch('http_misc.services.HttpService._send')
-    send_mocker.return_value = ServiceResponse(status=200, response_data=response_data, raw_response=None)
+    send_mocker.return_value = transports.ServiceResponse(status=200, response_data=response_data, raw_response=None)
 
     policy = AsyncRetryPolicy()
-    service = HttpService()
+    service = HttpService(transport=transport)
     request = {
         'method': 'GET',
         'url': 'https://localhost:8000',
@@ -46,7 +97,7 @@ async def test_http_service__500(mocker):
         'error': 'Error1'
     }
     send_mocker = mocker.patch('http_misc.services.HttpService._send')
-    send_mocker.return_value = ServiceResponse(status=500, response_data=response_data, raw_response=None)
+    send_mocker.return_value = transports.ServiceResponse(status=500, response_data=response_data, raw_response=None)
 
     policy = AsyncRetryPolicy()
     service = HttpService()

@@ -1,10 +1,20 @@
+# History
+
+3.0.0
+==================
+
+1. Масштабный рефакторинг, связанный с изменением архитектуры пакета, добавлена сущность, отвечающая за реализацию
+   транспорта (см. подробнее далее). Обратная совместимость гарантирована на 99% - класс ServiceResponse перенесен в
+   новый модуль.
+2. Реализована задача https://github.com/agorinenko/http-misc/issues/9
+3. Реализована задача https://github.com/agorinenko/http-misc/issues/10
+
 # http-misc 2.0.1 release notes
 
 1. Добавлен базовый класс OAuthTokenTransformer
 2. Доработан трансформер SetSystemOAuthToken для использования его в качестве базового класса
 3. Реализован трансформер SetUserOAuthToken, который указывает Bearer token для пользовательских учетных записей
-4. Изменен подход к кешированию данных: добавлены BaseCache и MemoryCache, убраны TokenCache и MemoryTokenCache 
-
+4. Изменен подход к кешированию данных: добавлены BaseCache и MemoryCache, убраны TokenCache и MemoryTokenCache
 
 # http-misc 1.0.7 release notes
 
