@@ -1,9 +1,8 @@
+import uuid
 from unittest.mock import MagicMock, AsyncMock
 
-import aiohttp
 import pytest
 from aiohttp import client_exceptions
-from asgiref.sync import sync_to_async, async_to_sync
 
 from http_misc import services
 from http_misc.errors import RetryError, MaxRetryError
@@ -72,11 +71,10 @@ async def test_async_apply__error(clazz):
 
 async def test_retry_on_exceptions():
     """ Проверка того, что DNS недоступен """
-
     service = services.HttpService()
     request = {
         'method': 'GET',
-        'url': 'http://yandex.abc/notfound',
+        'url': f'http://{uuid.uuid4()}.abc/notfound',
         'cfg': {
             'timeout': 10
         }
@@ -93,12 +91,12 @@ async def test_retry_on_exceptions():
         await policy.apply(service.send_request, **request)
 
 
-def test_retry_on_exceptions__sync():
+async def test_retry_on_exceptions__sync():
     """ Проверка того, что DNS недоступен """
     service = services.HttpService()
     request = {
         'method': 'GET',
-        'url': 'http://yandex.abc/notfound',
+        'url': f'http://{uuid.uuid4()}/notfound',
         'cfg': {
             'timeout': 10
         }
@@ -107,7 +105,7 @@ def test_retry_on_exceptions__sync():
     retry_on_exceptions = [
         client_exceptions.ClientConnectorError
     ]
-    policy = RetryPolicy(max_retry=max_retry, backoff_factor=0.001, jitter=0.001,
+    policy = AsyncRetryPolicy(max_retry=max_retry, backoff_factor=0.001, jitter=0.001,
                          retry_on_exceptions=retry_on_exceptions)
     with pytest.raises(MaxRetryError, match=f'Exceeded the maximum number of attempts {max_retry}.'):
-        policy.apply(async_to_sync(service.send_request), **request)
+        await policy.apply(service.send_request, **request)

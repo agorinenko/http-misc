@@ -5,12 +5,12 @@ import datetime
 import decimal
 import json
 import uuid
-from typing import Optional
+from collections.abc import Sequence, Collection
+from typing import Any
 
 import jwt
-from jwt import ExpiredSignatureError, InvalidTokenError
 
-from http_misc import services, errors, retry_policy
+from http_misc import errors
 
 
 def default_encoder(obj):
@@ -38,22 +38,36 @@ def join_str(*args, sep: str | None = '/', append_last_sep: bool | None = False)
     return url
 
 
-async def send_and_validate(service: 'services.BaseService', request, expected_status: int | None = 200,
-                            policy: Optional['retry_policy.AsyncRetryPolicy'] = None):
+async def send_and_validate(service,  # services.BaseService
+                            request,
+                            expected_status: int | None = 200,
+                            ignore_status: int | Collection[int] = None,
+                            policy=None):  # retry_policy.AsyncRetryPolicy | None
     """ Вызов внешнего сервиса и проверка его статуса"""
     if policy:
         response = await policy.apply(service.send_request, **request)
     else:
         response = await service.send_request(**request)
 
-    if response.status != expected_status:
+    if not _is_legal_status(response.status, expected_status=expected_status, ignore_status=ignore_status):
         raise errors.InteractionError('Произошла ошибка при вызове внешнего сервиса',
                                       status_code=response.status, response=response.response_data)
 
     return response.response_data
 
 
-def filter_list_by_key(filter_data: list, id_key: str, key_value,
+def _is_legal_status(status: int, expected_status: int | None = 200,
+                     ignore_status: int | Collection[int] = None) -> bool:
+    if ignore_status and status in ignore_status:
+        return True
+
+    if status == expected_status:
+        return True
+
+    return False
+
+
+def filter_list_by_key(filter_data: list, id_key: str, key_value: Any,
                        find_first: bool | None = True,
                        raise_if_not_found: bool | None = False) -> list | dict:
     """ Фильтрация списка словарей по ключевому полю """
@@ -98,21 +112,26 @@ def parse_authorization_header(authorization_header: str) -> tuple[str, str]:
     return auth[0], auth[1]
 
 
-def token_is_valid(authorization_header: str, use_utc: bool | None = True) -> bool:
+def token_is_valid(authorization_header: str, use_utc: bool | None = True, secret_key: str | bytes = '',
+                   algorithms: Sequence[str] | None = None) -> bool:
     """
-    Проверка времени жизни токена. True - токен еще действителен.
+    Проверка времени жизни токена.
+
+    True - токен еще действителен.
     """
     token_name, token = parse_authorization_header(authorization_header)
 
     if token_name.lower() == 'bearer':
         try:
-            decoded = jwt.decode(token, options={'verify_signature': False})
+            options = {'verify_signature': bool(secret_key)}
+
+            decoded = jwt.decode(token, key=secret_key, algorithms=algorithms, options=options)
             exp = decoded.get('exp')
             if exp:
                 now = datetime.datetime.now(tz=datetime.timezone.utc if use_utc else None)
                 current_time = now.timestamp()
                 return current_time < exp
-        except (ExpiredSignatureError, InvalidTokenError, jwt.DecodeError):
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, jwt.InvalidSignatureError, jwt.DecodeError):
             return False
 
     return True

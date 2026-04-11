@@ -1,60 +1,44 @@
-from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from typing import Any
+import abc
+import pprint
 
-from aiohttp import ContentTypeError, ClientSession
-
-from http_misc import http_utils, errors
+from http_misc import errors, transformers, transports
 from http_misc.logger import get_logger
 
-DEFAULT_RETRY_ON_STATUSES = frozenset([408, 429, 500, 502, 503, 504])
+DEFAULT_RETRY_ON_STATUSES = frozenset([408, 429, 502, 503, 504])
+
 logger = get_logger('services')
 
 
-@dataclass
-class ServiceResponse:
-    """ Ответ сервиса """
-    status: int
-    response_data: Any = None
-    raw_response: Any = None
-
-
-class Transformer(ABC):
-    @abstractmethod
-    async def modify(self, *args, **kwargs):
-        """ Изменение параметров запроса или ответа """
-        return args, kwargs
-
-
-class BaseService(ABC):
+class BaseService(abc.ABC):
     """
-    Abstract service
+    Базовый сервис
     """
 
     def __init__(self, retry_on_statuses: set[int] | None = DEFAULT_RETRY_ON_STATUSES,
-                 request_preproc: list[Transformer] | None = None,
-                 response_preproc: list[Transformer] | None = None):
+                 request_preproc: list[transformers.Transformer] | None = None,
+                 response_preproc: list[transformers.Transformer] | None = None,
+                 transport: transports.BaseTransport | None = None):
         """ Сервис """
         self.retry_on_statuses = retry_on_statuses
         self.request_preproc = request_preproc
         self.response_preproc = response_preproc
+        self.transport = transport
 
-    @abstractmethod
-    async def _send(self, *args, **kwargs) -> ServiceResponse:
-        """
-        Abstract _send
-        """
-        raise NotImplementedError('Not implemented _send method')
+        if not self.transport:
+            from http_misc.aiohttp.transports import AioHttpTransport
+            self.transport = AioHttpTransport()
 
-    async def send_request(self, *args, **kwargs) -> ServiceResponse:
+    async def _send(self, **kwargs) -> transports.ServiceResponse:
+        raise NotImplementedError('_send')
+
+    async def send_request(self, *args, **kwargs) -> transports.ServiceResponse:
         """
         Вызов внешнего сервиса
         """
         try:
             args, kwargs = await self._before_send(*args, **kwargs)
             logger.debug('Send request %s; %s', args, kwargs)
-            service_response = await self._send(*args, **kwargs)
+            service_response = await self._send(**kwargs)
             service_response = await self._transform_response(service_response)
             logger.debug('Response: %s, %s', service_response.status, service_response.response_data)
 
@@ -68,7 +52,7 @@ class BaseService(ABC):
 
             return await self._on_error(ex, *args, **kwargs)
 
-    async def _transform_response(self, response: ServiceResponse) -> ServiceResponse:
+    async def _transform_response(self, response: transports.ServiceResponse) -> transports.ServiceResponse:
         """ Преобразование ответа для возврата пользователю """
         if self.response_preproc:
             for response_preproc in self.response_preproc:
@@ -82,24 +66,22 @@ class BaseService(ABC):
                 args, kwargs = await request_preproc.modify(*args, **kwargs)
         return args, kwargs
 
-    async def _on_error(self, ex: Exception, *args, **kwargs) -> ServiceResponse:  # pylint: disable=unused-argument
+    async def _on_error(self, ex: Exception, *args, **kwargs) -> transports.ServiceResponse:
         """
         Действие на возникновение ошибки.
         """
+        logger.error('Error.\nargs: %s\nkwargs: %s', pprint.pformat(args), pprint.pformat(kwargs))
         logger.exception(ex)
+
         raise ex
 
 
 class HttpService(BaseService):
     """
-    Вызов сервиса по протоколу http
+    Вызов сервиса по протоколу http. Реализация жизненного цикла запроса
     """
 
-    def __init__(self, *args, client_session: ClientSession | None = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.client_session = client_session
-
-    async def _send(self, *args, **kwargs) -> ServiceResponse:
+    async def _send(self, **kwargs) -> transports.ServiceResponse:
         method = kwargs.get('method', 'get')
         url = kwargs.get('url', None)
         if url is None:
@@ -110,25 +92,4 @@ class HttpService(BaseService):
         if not isinstance(cfg, dict):
             raise ValueError('Invalid cfg type. Must be dict.')
 
-        if url.lower().startswith('https://') and 'ssl' not in cfg:
-            cfg['ssl'] = False
-
-        async with self._use_client_session() as session:
-            async with session.request(method, url, **cfg) as response:
-                response_data = await _get_response_content(response)
-                return ServiceResponse(status=response.status, response_data=response_data, raw_response=response)
-
-    @asynccontextmanager
-    async def _use_client_session(self):
-        if self.client_session is not None:
-            yield self.client_session
-        else:
-            async with ClientSession(json_serialize=http_utils.json_dumps) as session:
-                yield session
-
-
-async def _get_response_content(response):
-    try:
-        return await response.json()
-    except ContentTypeError:
-        return await response.text()
+        return await self.transport.request(method, url, **cfg)

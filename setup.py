@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='http-misc',
-    version='2.0.1',
+    version='3.0.0',
     author='Anton Gorinenko',
     author_email='anton.gorinenko@gmail.com',
     description='Утилитарный пакет межсервисного взаимодействия по протоколу HTTP',
@@ -20,19 +20,22 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     install_requires=[
-        'aiohttp',
         'PyJWT'
     ],
     extras_require={
+        'aiohttp': ['aiohttp'],
+        'httpx': ['httpx'],
+        'all': ['aiohttp', 'httpx'],
         'test': [
+            'aiohttp',
+            'httpx',
             'pytest',
             'python-dotenv',
             'envparse',
             'pytest-asyncio',
             'pytest-mock',
             'pytest-env',
-            'freezegun',
-            'asgiref'
+            'freezegun'
         ]
     },
     python_requires='>=3.10',

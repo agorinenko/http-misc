@@ -18,8 +18,7 @@ class BaseCache(abc.ABC):
 
     @abc.abstractmethod
     async def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
-        """ Установка значения.
-        expired_timeout переопределит базовое значение self.expired_timeout только в случае > 0 """
+        """ Установка значения, expired_timeout переопределит базовое значение self.expired_timeout только в случае > 0 """
         raise NotImplementedError('set_value')
 
     @abc.abstractmethod
@@ -57,10 +56,16 @@ class MemoryCache(BaseCache):
         self.use_expire_info = self.expired_timeout is not None and self.expired_timeout > 0
 
     async def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
-        self.data[key] = value
+        if self.expired_timeout == 0:
+            return None
+
         if self.use_expire_info:
             expired_seconds = expired_timeout if expired_timeout is not None and expired_timeout > 0 else self.expired_timeout
             self.expire_info[key] = self._now() + timedelta(seconds=expired_seconds)
+
+        self.data[key] = value
+
+        return None
 
     async def get(self, key: str) -> Any | None:
         if await self.has_key(key):
@@ -76,22 +81,25 @@ class MemoryCache(BaseCache):
             self.expire_info.pop(key)
 
     async def has_key(self, key) -> bool:
-        if key not in self.data:
-            await self.remove(key)
+        # Механизм устаревания не используется
+        if self.expired_timeout == 0:
             return False
 
-        if not self.use_expire_info:
+        if self.use_expire_info:
+            # Используем механизм устаревания
+            if key not in self.expire_info or key not in self.data:
+                # Ключа нет в хранилище дат или нет в основном хранилище
+                await self.remove(key)
+                return False
+
+            if self.expire_info[key] < self._now():
+                # Ключ устарел
+                await self.remove(key)
+                return False
+            # Ключ есть и не устарел
             return True
 
-        if key not in self.expire_info:
-            await self.remove(key)
-            return False
-
-        if self.expire_info[key] < self._now():
-            await self.remove(key)
-            return False
-
-        return True
+        return key in self.data
 
     def _now(self):
         return datetime.now(tz=timezone.utc if self.use_utc else None)
