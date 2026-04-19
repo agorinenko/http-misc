@@ -75,7 +75,7 @@ class AsyncRetryPolicy(BaseRetryPolicy):
             while True:
                 current_step = self.request_count_manager.get(request_id)
                 if current_step > 0:
-                    logger.debug('Step %s. Repeat action #%s.', request_id)
+                    logger.debug('Step %s. Repeat action #%s.', current_step, request_id)
                 try:
                     return await action(*args, **kwargs)
                 except self.retry_on_exceptions as ex:
@@ -107,7 +107,7 @@ class RetryPolicy(BaseRetryPolicy):
             while True:
                 current_step = self.request_count_manager.get(request_id)
                 if current_step > 0:
-                    logger.debug('Step %s. Repeat action #%s.', request_id)
+                    logger.debug('Step %s. Repeat action #%s.', current_step, request_id)
                 try:
                     return action(*args, **kwargs)
                 except self.retry_on_exceptions as ex:
