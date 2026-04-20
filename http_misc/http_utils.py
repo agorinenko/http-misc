@@ -49,6 +49,9 @@ async def send_and_validate(service,  # services.BaseService
     else:
         response = await service.send_request(**request)
 
+    if response is None:
+        return None
+
     if not _is_legal_status(response.status, expected_status=expected_status, ignore_status=ignore_status):
         raise errors.InteractionError('Произошла ошибка при вызове внешнего сервиса',
                                       status_code=response.status, response=response.response_data)
