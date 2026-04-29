@@ -95,7 +95,7 @@ class AsyncRetryPolicy(BaseRetryPolicy):
             self.request_count_manager.pop(request_id)
 
 
-class RetryPolicy(BaseRetryPolicy):
+class SyncRetryPolicy(BaseRetryPolicy):
     """
     Политика повторов синхронных действий
     """

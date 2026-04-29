@@ -12,7 +12,7 @@ class ServiceResponse:
 
 
 class BaseTransport(abc.ABC):
-    """ Абстрактный транспорт  """
+    """ Абстрактный фсинхронный транспорт  """
 
     @abc.abstractmethod
     async def close(self, *args, **kwargs):
@@ -21,5 +21,18 @@ class BaseTransport(abc.ABC):
 
     @abc.abstractmethod
     async def request(self, *args, **kwargs) -> ServiceResponse:
+        """ Выполнение HTTP запроса """
+        raise NotImplementedError('request')
+
+class BaseSyncTransport(abc.ABC):
+    """ Абстрактный синхронный транспорт  """
+
+    @abc.abstractmethod
+    def close(self, *args, **kwargs):
+        """ Закрытие сессии """
+        raise NotImplementedError('close')
+
+    @abc.abstractmethod
+    def request(self, *args, **kwargs) -> ServiceResponse:
         """ Выполнение HTTP запроса """
         raise NotImplementedError('request')

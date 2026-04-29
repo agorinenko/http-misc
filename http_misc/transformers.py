@@ -86,8 +86,7 @@ class OAuthTokenTransformer(TokenTransformer, ABC):
                  refresh_token_field: str | None = 'refresh_token',
                  expires_in_field: str | None = 'expires_in',
                  execute_token_request_func: EXEC_TOKEN_TYPE | None = None,
-                 use_utc: bool | None = True,
-                 **kwargs):
+                 use_utc: bool | None = True, **kwargs):
         """
         Базовый класс, отвечающий за получение и обновление токена у OAuth провайдера
         :param client_id: идентификатор клиента
