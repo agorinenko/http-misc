@@ -5,13 +5,35 @@ import aiohttp
 import httpx
 import pytest
 
-from http_misc import http_utils, transports, errors
+from http_misc import http_utils, transports
 from http_misc.aiohttp.transports import AioHttpTransport
 
 from http_misc.errors import RetryError, MaxRetryError
 from http_misc.httpx.transports import HttpxTransport
-from http_misc.retry_policy import AsyncRetryPolicy
-from http_misc.services import HttpService
+from http_misc.requests.transports import RequestsTransport
+from http_misc.retry_policy import AsyncRetryPolicy, SyncRetryPolicy
+from http_misc.services import HttpService, SyncHttpService
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('transport', (
+        None,
+        RequestsTransport(),
+))
+@pytest.mark.parametrize('url', (
+        'https://jsonplaceholder.typicode.com/todos',
+        'https://gorinenko.ru/'
+))
+def test_http_service__sync_integration(transport, url):
+    policy = SyncRetryPolicy()
+    service = SyncHttpService(transport=transport)
+    request = {
+        'method': 'GET',
+        'url': url
+    }
+
+    result = policy.apply(service.send_request, **request)
+    assert result.status == 200
 
 
 @pytest.mark.integration
@@ -24,7 +46,7 @@ from http_misc.services import HttpService
         'https://jsonplaceholder.typicode.com/todos',
         'https://gorinenko.ru/'
 ))
-async def test_http_service_integration(transport, url):
+async def test_http_service__async_integration(transport, url):
     policy = AsyncRetryPolicy()
     service = HttpService(transport=transport)
     request = {

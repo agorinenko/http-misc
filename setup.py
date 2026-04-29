@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='http-misc',
-    version='3.0.2',
+    version='3.1.1',
     author='Anton Gorinenko',
     author_email='anton.gorinenko@gmail.com',
     description='Утилитарный пакет межсервисного взаимодействия по протоколу HTTP',
@@ -25,10 +25,12 @@ setuptools.setup(
     extras_require={
         'aiohttp': ['aiohttp'],
         'httpx': ['httpx'],
-        'all': ['aiohttp', 'httpx'],
+        'requests': ['requests'],
+        'all': ['aiohttp', 'httpx', 'requests'],
         'test': [
             'aiohttp',
             'httpx',
+            'requests',
             'pytest',
             'python-dotenv',
             'envparse',
