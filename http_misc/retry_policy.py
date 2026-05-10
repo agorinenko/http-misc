@@ -50,7 +50,10 @@ class BaseRetryPolicy(ABC):
 
         self.request_count_manager = RequestCountManager()
 
-    def _on_retry_error(self, current_step: int, request_id: uuid.UUID) -> float:
+    def _on_retry_error(self, current_step: int, request_id: uuid.UUID) -> None:
+        if self.max_retry <= 0:
+            return None
+
         if current_step >= self.max_retry:
             raise MaxRetryError(f'Exceeded the maximum number of attempts {self.max_retry}.')
 
@@ -60,7 +63,10 @@ class BaseRetryPolicy(ABC):
             # sleep_seconds += random.uniform(sleep_seconds * (1 - self.jitter), sleep_seconds * (1 + self.jitter))
 
         self.request_count_manager.inc(request_id)
-        return max(0.001, sleep_seconds)
+        sleep_seconds = max(0.001, sleep_seconds)
+
+        sleep(sleep_seconds)
+        return None
 
 
 class AsyncRetryPolicy(BaseRetryPolicy):
@@ -82,8 +88,7 @@ class AsyncRetryPolicy(BaseRetryPolicy):
                     if self.ignore_exceptions and type(ex) in self.ignore_exceptions:
                         break
 
-                    sleep_seconds = self._on_retry_error(current_step, request_id)
-                    await asyncio.sleep(sleep_seconds)
+                    self._on_retry_error(current_step, request_id)
                 except Exception as ex:
                     if self.ignore_exceptions and type(ex) in self.ignore_exceptions:
                         break
@@ -113,8 +118,7 @@ class SyncRetryPolicy(BaseRetryPolicy):
                 except self.retry_on_exceptions as ex:
                     if self.ignore_exceptions and type(ex) in self.ignore_exceptions:
                         break
-                    sleep_seconds = self._on_retry_error(current_step, request_id)
-                    sleep(sleep_seconds)
+                    self._on_retry_error(current_step, request_id)
         finally:
             self.request_count_manager.pop(request_id)
 

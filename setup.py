@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name='http-misc',
-    version='3.1.1',
+    version='3.1.2',
     author='Anton Gorinenko',
     author_email='anton.gorinenko@gmail.com',
     description='Утилитарный пакет межсервисного взаимодействия по протоколу HTTP',
