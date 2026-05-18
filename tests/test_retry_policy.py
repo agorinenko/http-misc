@@ -6,10 +6,10 @@ from aiohttp import client_exceptions
 
 from http_misc import services
 from http_misc.errors import RetryError, MaxRetryError
-from http_misc.retry_policy import RetryPolicy, AsyncRetryPolicy
+from http_misc.retry_policy import AsyncRetryPolicy, SyncRetryPolicy
 
 
-@pytest.mark.parametrize('clazz', [RetryPolicy, AsyncRetryPolicy])
+@pytest.mark.parametrize('clazz', [SyncRetryPolicy, AsyncRetryPolicy])
 async def test_async_apply(clazz):
     """ Выполнение асинхронного действия. Успех """
     policy = clazz()
@@ -29,7 +29,7 @@ async def test_async_apply(clazz):
     assert len(requests.keys()) == 0
 
 
-@pytest.mark.parametrize('clazz', [RetryPolicy, AsyncRetryPolicy])
+@pytest.mark.parametrize('clazz', [SyncRetryPolicy, AsyncRetryPolicy])
 async def test_async_apply__retry_error(clazz):
     """ Выполнение асинхронного действия. RetryError """
     max_retry = 5
@@ -50,7 +50,7 @@ async def test_async_apply__retry_error(clazz):
     assert len(requests.keys()) == 0
 
 
-@pytest.mark.parametrize('clazz', [RetryPolicy, AsyncRetryPolicy])
+@pytest.mark.parametrize('clazz', [SyncRetryPolicy, AsyncRetryPolicy])
 async def test_async_apply__error(clazz):
     """ Выполнение асинхронного действия. Exception """
     policy = clazz()

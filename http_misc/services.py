@@ -2,6 +2,7 @@ import abc
 import pprint
 
 from http_misc import errors, transformers, transports
+from http_misc.configuration import Configuration
 from http_misc.logger import get_logger
 
 DEFAULT_RETRY_ON_STATUSES = frozenset([408, 429, 502, 503, 504])
@@ -82,17 +83,8 @@ class HttpService(BaseService):
     """
 
     async def _send(self, **kwargs) -> transports.ServiceResponse:
-        method = kwargs.get('method', 'get')
-        url = kwargs.get('url', None)
-        if url is None:
-            raise ValueError('Url is none')
-        url = str(url)
-
-        cfg = kwargs.get('cfg', {})
-        if not isinstance(cfg, dict):
-            raise ValueError('Invalid cfg type. Must be dict.')
-
-        return await self.transport.request(method, url, **cfg)
+        method, url, http_cfg = _cfg_request(kwargs)
+        return await self.transport.request(method, url, **http_cfg)
 
 
 class BaseSyncService(abc.ABC):
@@ -168,14 +160,30 @@ class SyncHttpService(BaseSyncService):
     """
 
     def _send(self, **kwargs) -> transports.ServiceResponse:
-        method = kwargs.get('method', 'get')
-        url = kwargs.get('url', None)
-        if url is None:
-            raise ValueError('Url is none')
-        url = str(url)
+        method, url, http_cfg = _cfg_request(kwargs)
 
-        cfg = kwargs.get('cfg', {})
-        if not isinstance(cfg, dict):
-            raise ValueError('Invalid cfg type. Must be dict.')
+        return self.transport.request(method, url, **http_cfg)
 
-        return self.transport.request(method, url, **cfg)
+
+def _cfg_request(kwargs: dict):
+    configuration = Configuration.instance()
+
+    method = kwargs.get('method', configuration.default_http_method)
+    url = kwargs.get('url', configuration.default_url)
+    if not url:
+        raise ValueError('Url is none or empty')
+
+    url = str(url)
+
+    cfg = kwargs.get('cfg', {})
+
+    if not isinstance(cfg, dict):
+        raise ValueError('Invalid cfg type. Must be dict.')
+
+    if configuration.default_http_cfg:
+        http_cfg = configuration.default_http_cfg.copy()
+        http_cfg.update(cfg)
+    else:
+        http_cfg = cfg
+
+    return method, url, http_cfg

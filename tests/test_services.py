@@ -4,15 +4,68 @@ from unittest.mock import call
 import aiohttp
 import httpx
 import pytest
+from http_misc.transports import ServiceResponse
 
 from http_misc import http_utils, transports
 from http_misc.aiohttp.transports import AioHttpTransport
+from http_misc.configuration import Configuration
 
 from http_misc.errors import RetryError, MaxRetryError
 from http_misc.httpx.transports import HttpxTransport
 from http_misc.requests.transports import RequestsTransport
 from http_misc.retry_policy import AsyncRetryPolicy, SyncRetryPolicy
 from http_misc.services import HttpService, SyncHttpService
+
+
+async def test_default_configuration(mocker):
+    """ Проверка proxy """
+    url = 'http://127.0.0.1:8000/api/v1/health/'
+    proxy = 'http://user:pass@some.proxy.com:123'
+    timeout = 10
+    method = 'POST'
+    policy = SyncRetryPolicy()
+    service = SyncHttpService(transport=RequestsTransport())
+    send_request_mock = mocker.patch.object(service.transport, 'request',
+                                            return_value=ServiceResponse(status=200, response_data={'status': True}))
+    Configuration.default_http_method = 'GET'
+    Configuration.default_url = 'https://jsonplaceholder.typicode.com/todos'
+    Configuration.default_http_cfg = {
+        'proxy': proxy,
+        'timeout': timeout
+    }
+
+    request = {
+        'method': method,
+        'url': url
+    }
+    result = policy.apply(service.send_request, **request)
+    assert result.status == 200
+
+    expected_kwargs = {
+        'proxy': proxy,
+        'timeout': timeout
+    }
+    send_request_mock.assert_called_once_with(method, url, **expected_kwargs)
+    send_request_mock.reset_mock()
+    # Переопределяем proxy
+    new_proxy = '123'
+    request = {
+        'method': method,
+        'url': url,
+        'cfg': {
+            'proxy': new_proxy,
+        }
+    }
+    result = policy.apply(service.send_request, **request)
+    assert result.status == 200
+
+    expected_kwargs = {
+        'proxy': new_proxy,
+        'timeout': timeout
+    }
+    send_request_mock.assert_called_once_with(method, url, **expected_kwargs)
+
+    Configuration.reset_to_default()
 
 
 @pytest.mark.integration
