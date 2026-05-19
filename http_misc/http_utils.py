@@ -1,6 +1,9 @@
 """
 Утилитарные функции
 """
+import contextlib
+import contextvars
+import copy
 import datetime
 import decimal
 import json
@@ -12,6 +15,22 @@ from typing import Any
 import jwt
 
 from http_misc import errors
+
+_REQUEST_CONTEXT = contextvars.ContextVar('_REQUEST_CONTEXT', default={})
+
+
+@contextlib.contextmanager
+def request_context(**kwargs):
+    current_context = _REQUEST_CONTEXT.get()
+    new_context = copy.deepcopy(current_context)
+    new_context.update(kwargs)
+    reset_token = _REQUEST_CONTEXT.set(new_context)
+    yield new_context
+    _REQUEST_CONTEXT.reset(reset_token)
+
+
+def get_request_context():
+    return _REQUEST_CONTEXT.get()
 
 
 def default_encoder(obj):
@@ -139,6 +158,7 @@ def token_is_valid(authorization_header: str, use_utc: bool | None = True, secre
             return False
 
     return True
+
 
 class SingletonMeta(type):
     """ Потокобезопасный мета класс для Singleton """
