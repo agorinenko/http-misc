@@ -1,5 +1,12 @@
 # History
 
+4.0.0
+==================
+
+1. Переработан механизм подсчета количества вызовов
+2. Удалены AsyncRequestCountManager и SyncRequestCountManager
+
+
 3.1.5
 ==================
 
