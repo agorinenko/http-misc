@@ -3,11 +3,10 @@
 """
 import asyncio
 import random
-import threading
 import uuid
 from abc import ABC
 from collections.abc import Callable, Iterable
-from time import sleep, time
+from time import sleep
 
 from http_misc import http_utils
 from http_misc.errors import RetryError, MaxRetryError
@@ -50,9 +49,9 @@ class BaseRetryPolicy(ABC):
         self.retry_on_exceptions = tuple(_retry_on_exceptions)
         self.ignore_exceptions = ignore_exceptions
 
-    def _on_retry_error(self, current_step: int) -> None:
+    def _calculate_sleep_seconds(self, current_step: int) -> float:
         if self.max_retry <= 0:
-            return None
+            return 0
 
         if current_step >= self.max_retry:
             raise MaxRetryError(f'Exceeded the maximum number of attempts {self.max_retry}.')
@@ -62,10 +61,7 @@ class BaseRetryPolicy(ABC):
             sleep_seconds += random.normalvariate(0, sleep_seconds * self.jitter)
             # sleep_seconds += random.uniform(sleep_seconds * (1 - self.jitter), sleep_seconds * (1 + self.jitter))
 
-        sleep_seconds = max(0.001, sleep_seconds)
-
-        sleep(sleep_seconds)
-        return None
+        return max(0.001, sleep_seconds)
 
 
 class AsyncRetryPolicy(BaseRetryPolicy):
@@ -86,8 +82,10 @@ class AsyncRetryPolicy(BaseRetryPolicy):
                 except self.retry_on_exceptions as ex:
                     if self.ignore_exceptions and type(ex) in self.ignore_exceptions:
                         break
+                    sleep_seconds = self._calculate_sleep_seconds(current_step)
+                    if sleep_seconds:
+                        await asyncio.sleep(sleep_seconds)
 
-                    self._on_retry_error(current_step)
                     current_step += 1
                 except Exception as ex:
                     if self.ignore_exceptions and type(ex) in self.ignore_exceptions:
@@ -117,5 +115,7 @@ class SyncRetryPolicy(BaseRetryPolicy):
                     if self.ignore_exceptions and type(ex) in self.ignore_exceptions:
                         break
 
-                    self._on_retry_error(current_step)
+                    sleep_seconds = self._calculate_sleep_seconds(current_step)
+                    if sleep_seconds:
+                        sleep(sleep_seconds)
                     current_step += 1
