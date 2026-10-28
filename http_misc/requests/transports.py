@@ -22,6 +22,10 @@ class RequestsTransport(BaseSyncTransport):
             self.client_session.close()
 
     def request(self, method: str, url: str, **kwargs) -> ServiceResponse:
+        # Проверка SSL для https отключена по умолчанию, как в AioHttpTransport и HttpxTransport
+        if url.lower().startswith('https://') and 'verify' not in kwargs:
+            kwargs['verify'] = False
+
         with self._use_client_session() as session:
             response = session.request(method=method, url=url, **kwargs)
             response_data = self._get_response_content(response)
