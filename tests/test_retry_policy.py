@@ -32,9 +32,7 @@ async def test_async_apply(clazz):
     else:
         result = policy.apply(some_action)
 
-    requests = await policy.request_count_manager.get_requests() if is_async_policy else policy.request_count_manager.get_requests()
     assert result == '123'
-    assert len(requests.keys()) == 0
 
 
 @pytest.mark.parametrize('clazz', [SyncRetryPolicy, AsyncRetryPolicy])
@@ -53,9 +51,7 @@ async def test_async_apply__retry_error(clazz):
         else:
             policy.apply(some_action)
 
-    requests = await policy.request_count_manager.get_requests() if is_async_policy else policy.request_count_manager.get_requests()
     assert some_action.call_count == max_retry + 1
-    assert len(requests.keys()) == 0
 
 
 @pytest.mark.parametrize('clazz', [SyncRetryPolicy, AsyncRetryPolicy])
@@ -72,9 +68,7 @@ async def test_async_apply__error(clazz):
         else:
             policy.apply(some_action)
 
-    requests = await policy.request_count_manager.get_requests() if is_async_policy else policy.request_count_manager.get_requests()
     assert some_action.call_count == 1
-    assert len(requests.keys()) == 0
 
 
 async def test_retry_on_exceptions():

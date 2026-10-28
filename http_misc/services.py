@@ -15,7 +15,7 @@ class BaseService(abc.ABC):
     Базовый асинхронный сервис
     """
 
-    def __init__(self, retry_on_statuses: set[int] | None = DEFAULT_RETRY_ON_STATUSES,
+    def __init__(self, retry_on_statuses: set[int] |frozenset[int] | None = DEFAULT_RETRY_ON_STATUSES,
                  request_preproc: list[transformers.Transformer] | None = None,
                  response_preproc: list[transformers.Transformer] | None = None,
                  transport: transports.BaseTransport | None = None):
@@ -92,9 +92,9 @@ class BaseSyncService(abc.ABC):
     Базовый синхронный сервис
     """
 
-    def __init__(self, retry_on_statuses: set[int] | None = DEFAULT_RETRY_ON_STATUSES,
-                 request_preproc: list[transformers.Transformer] | None = None,
-                 response_preproc: list[transformers.Transformer] | None = None,
+    def __init__(self, retry_on_statuses: set[int] |frozenset[int] | None = DEFAULT_RETRY_ON_STATUSES,
+                 request_preproc: list[transformers.SyncTransformer] | None = None,
+                 response_preproc: list[transformers.SyncTransformer] | None = None,
                  transport: transports.BaseSyncTransport | None = None):
         """ Сервис """
         self.retry_on_statuses = retry_on_statuses

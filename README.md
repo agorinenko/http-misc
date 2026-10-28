@@ -1,15 +1,15 @@
 # HTTP Misc Library
 
-Асинхронная библиотека для HTTP взаимодействия с поддержкой retry policy, кэширования токенов OAuth 2.0 и множества
-транспортов.
+Библиотека для HTTP взаимодействия с поддержкой синхронных и асинхронных вызовов, retry policy, кэширования токенов
+OAuth 2.0 и множества транспортов.
 
 ## Особенности
 
-- 🚀 **Полностью асинхронная** - построена на asyncio
+- 🚀 **Синхронные и асинхронные вызовы** - asyncio и requests
 - 🔄 **Умные повторные попытки** - экспоненциальная задержка с jitter
 - 🔐 **OAuth 2.0 из коробки** - автоматическое получение и обновление токенов
 - 💾 **Кэширование с TTL** - встроенный MemoryCache
-- 🔌 **Несколько транспортов** - aiohttp, httpx, gRPC
+- 🔌 **Несколько транспортов** - aiohttp, httpx, requests, gRPC
 - 🔧 **Трансформеры** - гибкая модификация запросов/ответов
 - 🛡️ **Безопасность** - проверка подписи JWT токенов
 - 📊 **Мониторинг** - встроенное логирование и метрики
@@ -170,6 +170,21 @@ if await cache.has_key("user:123"):
     print("Key exists and not expired")
 ```
 
+Для синхронного кода есть `MemorySyncCache` с теми же сигнатурами методов, но без `await`:
+
+```python
+from http_misc.cache import MemorySyncCache
+
+cache = MemorySyncCache(expired_timeout=300)
+
+cache.set("user:123", {"name": "John"}, expired_timeout=60)
+data = cache.get("user:123")
+cache.remove("user:123")
+
+if cache.has_key("user:123"):
+    print("Key exists and not expired")
+```
+
 ###  Создание кастомного трансформера
 
 ```python
@@ -201,6 +216,57 @@ service = HttpService(
         oauth_transformer       # Добавляет Bearer токен
     ]
 )
+```
+
+### Синхронные вызовы
+
+Все асинхронные компоненты имеют синхронные аналоги: `SyncHttpService`, `SyncRetryPolicy`, `RequestsTransport`, а также
+синхронные трансформеры `SyncSetSystemOAuthToken`, `SyncSetUserOAuthToken` и `SyncSetBasicAuthorization`.
+Для синхронного кода используется кеш `MemorySyncCache` (сигнатуры его методов совпадают с `MemoryCache`),
+а `send_and_validate` работает как с синхронными, так и с асинхронными сервисами.
+
+```python
+from http_misc import cache, retry_policy, services, transformers
+from http_misc.http_utils import send_and_validate
+from http_misc.requests.transports import RequestsTransport
+
+transformer = transformers.SyncSetSystemOAuthToken(
+    client_id="your_client_id",
+    client_secret="your_secret",
+    scope="read write",
+    token_url="https://auth.example.com/oauth/token",
+    token_cache=cache.MemorySyncCache()
+)
+
+service = services.SyncHttpService(
+    request_preproc=[transformer],
+    transport=RequestsTransport()
+)
+
+# Для синхронного сервиса результат возвращается сразу, без await
+response = send_and_validate(
+    service,
+    {
+        'method': 'POST',
+        'url': 'https://api.example.com/protected',
+        'cfg': {'json': {'key': 'value'}}
+    },
+    expected_status=200,
+    policy=retry_policy.SyncRetryPolicy()
+)
+```
+
+### Создание кастомного синхронного трансформера
+
+```python
+from http_misc.transformers import SyncTransformer
+
+class LoggingTransformer(SyncTransformer):
+    def modify(self, *args, **kwargs):
+        print(f"Request: {args}, {kwargs}")
+        return args, kwargs
+
+service = SyncHttpService(request_preproc=[LoggingTransformer()])
 ```
 
 ### AioHttpTransport

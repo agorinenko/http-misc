@@ -167,6 +167,25 @@ async def test_http_service(mocker, transport):
     ]
 
 
+def test_http_service__sync_send_and_validate(mocker):
+    """ send_and_validate с синхронным сервисом """
+    response_data = {
+        'stateId': '123'
+    }
+    service = SyncHttpService(transport=RequestsTransport())
+    send_mocker = mocker.patch.object(service.transport, 'request',
+                                      return_value=transports.ServiceResponse(status=200, response_data=response_data))
+    policy = SyncRetryPolicy()
+    request = {
+        'method': 'GET',
+        'url': 'https://localhost:8000'
+    }
+
+    result = http_utils.send_and_validate(service, request, expected_status=200, policy=policy)
+    assert result == response_data
+    send_mocker.assert_called_once_with('GET', 'https://localhost:8000')
+
+
 async def test_http_service__500(mocker):
     response_data = {
         'error': 'Error1'
