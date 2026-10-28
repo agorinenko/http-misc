@@ -6,6 +6,7 @@ import contextvars
 import copy
 import datetime
 import decimal
+import inspect
 import json
 import threading
 import uuid
@@ -49,7 +50,7 @@ def json_dumps(*args, **kwargs):
     return json.dumps(*args, **kwargs, default=default_encoder)
 
 
-def join_str(*args, sep: str | None = '/', append_last_sep: bool | None = False) -> str:
+def join_str(*args, sep: str = '/', append_last_sep: bool | None = False) -> str:
     """ Объединение строк """
     args_str = [str(a) for a in args]
     url = sep.join([arg.strip(sep) for arg in args_str])
@@ -58,17 +59,48 @@ def join_str(*args, sep: str | None = '/', append_last_sep: bool | None = False)
     return url
 
 
-async def send_and_validate(service,  # services.BaseService
-                            request,
-                            expected_status: int | None = 200,
-                            ignore_status: int | Collection[int] = None,
-                            policy=None):  # retry_policy.AsyncRetryPolicy | None
-    """ Вызов внешнего сервиса и проверка его статуса"""
-    if policy:
-        response = await policy.apply(service.send_request, **request)
-    else:
-        response = await service.send_request(**request)
+class _AwaitableSendAndValidateResult:
+    """ Ожидаемый через await результат send_and_validate асинхронного сервиса """
 
+    def __init__(self, response, expected_status: int = 200,
+                 ignore_status: int | Collection[int] | None = None):
+        self._response = response
+        self._expected_status = expected_status
+        self._ignore_status = ignore_status
+
+    def __await__(self):
+        async def _await():
+            response = await self._response
+            return _validate_response(response, expected_status=self._expected_status,
+                                      ignore_status=self._ignore_status)
+
+        return _await().__await__()
+
+
+def send_and_validate(service,  # services.BaseService | services.BaseSyncService
+                      request,
+                      expected_status: int = 200,
+                      ignore_status: int | Collection[int] | None = None,
+                      policy=None):  # retry_policy.AsyncRetryPolicy | retry_policy.SyncRetryPolicy | None
+    """
+    Вызов внешнего сервиса и проверка его статуса.
+    Поддерживает асинхронные (результат ожидается через await) и синхронные сервисы.
+    """
+    if policy:
+        response = policy.apply(service.send_request, **request)
+    else:
+        response = service.send_request(**request)
+
+    if inspect.isawaitable(response):
+        return _AwaitableSendAndValidateResult(response, expected_status=expected_status,
+                                               ignore_status=ignore_status)
+
+    return _validate_response(response, expected_status=expected_status, ignore_status=ignore_status)
+
+
+def _validate_response(response, expected_status: int = 200,
+                       ignore_status: int | Collection[int] | None = None):
+    """ Проверка статуса ответа сервиса и возврат данных ответа """
     if response is None:
         return None
 
@@ -79,10 +111,13 @@ async def send_and_validate(service,  # services.BaseService
     return response.response_data
 
 
-def _is_legal_status(status: int, expected_status: int | None = 200,
-                     ignore_status: int | Collection[int] = None) -> bool:
-    if ignore_status and status in ignore_status:
-        return True
+def _is_legal_status(status: int, expected_status: int = 200,
+                     ignore_status: int | Collection[int] | None = None) -> bool:
+    if ignore_status:
+        if isinstance(ignore_status, int):
+            ignore_status = [ignore_status]
+        if status in ignore_status:
+            return True
 
     if status == expected_status:
         return True
@@ -91,8 +126,8 @@ def _is_legal_status(status: int, expected_status: int | None = 200,
 
 
 def filter_list_by_key(filter_data: list, id_key: str, key_value: Any,
-                       find_first: bool | None = True,
-                       raise_if_not_found: bool | None = False) -> list | dict:
+                       find_first: bool = True,
+                       raise_if_not_found: bool = False) -> list | dict:
     """ Фильтрация списка словарей по ключевому полю """
     if not isinstance(filter_data, list):
         raise KeyError('Invalid filter data - expected list.')

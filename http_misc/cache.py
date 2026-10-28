@@ -5,7 +5,7 @@ from typing import Any
 
 class BaseCache(abc.ABC):
     """
-    Класс, декларирующий общие методы работы с кешем
+    Класс, декларирующий общие методы работы с асинхронным кешем
     """
 
     def __init__(self, expired_timeout: float | None = 300):
@@ -19,12 +19,12 @@ class BaseCache(abc.ABC):
     @abc.abstractmethod
     async def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
         """ Установка значения, expired_timeout переопределит базовое значение self.expired_timeout только в случае > 0 """
-        raise NotImplementedError('set_value')
+        raise NotImplementedError('set')
 
     @abc.abstractmethod
     async def get(self, key: str) -> Any | None:
         """ Получение значения """
-        raise NotImplementedError('get_value')
+        raise NotImplementedError('get')
 
     @abc.abstractmethod
     async def remove(self, key: str) -> None:
@@ -37,8 +37,43 @@ class BaseCache(abc.ABC):
         raise NotImplementedError('has_key')
 
 
-class MemoryCache(BaseCache):
-    """ Класс, реализующий хранение данных в памяти. """
+class BaseSyncCache(abc.ABC):
+    """
+    Класс, декларирующий общие методы работы с синхронным кешем.
+    Сигнатуры методов совпадают с BaseCache за исключением того, что здесь они синхронные.
+    """
+
+    def __init__(self, expired_timeout: float | None = 300):
+        """
+        expired_timeout - время устаревания кэша по умолчанию, в секундах.
+        По умолчанию 300 секунд (5 минут). Вы можете установить expired_timeout в None, тогда кэш никогда не устареет.
+        Если указать 0, все ключи будут сразу устаревать (таким образом, можно заставить «не кэшировать»).
+        """
+        self.expired_timeout = expired_timeout
+
+    @abc.abstractmethod
+    def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
+        """ Установка значения, expired_timeout переопределит базовое значение self.expired_timeout только в случае > 0 """
+        raise NotImplementedError('set')
+
+    @abc.abstractmethod
+    def get(self, key: str) -> Any | None:
+        """ Получение значения """
+        raise NotImplementedError('get')
+
+    @abc.abstractmethod
+    def remove(self, key: str) -> None:
+        """ Очистка кеша """
+        raise NotImplementedError('remove')
+
+    @abc.abstractmethod
+    def has_key(self, key) -> bool:
+        """ Возвращает True если ключ не устарел и есть в хранилище. """
+        raise NotImplementedError('has_key')
+
+
+class _MemoryCacheMixin:
+    """ Общая реализация хранения данных в памяти """
 
     def __init__(self, *args, use_utc: bool | None = True, **kwargs):
         """
@@ -55,7 +90,7 @@ class MemoryCache(BaseCache):
         self.use_utc = use_utc
         self.use_expire_info = self.expired_timeout is not None and self.expired_timeout > 0
 
-    async def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
+    def _set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
         if self.expired_timeout == 0:
             return None
 
@@ -67,20 +102,20 @@ class MemoryCache(BaseCache):
 
         return None
 
-    async def get(self, key: str) -> Any | None:
-        if await self.has_key(key):
+    def _get(self, key: str) -> Any | None:
+        if self._has_key(key):
             return self.data[key]
 
         return None
 
-    async def remove(self, key: str) -> None:
+    def _remove(self, key: str) -> None:
         if key in self.data:
             self.data.pop(key)
 
         if key in self.expire_info:
             self.expire_info.pop(key)
 
-    async def has_key(self, key) -> bool:
+    def _has_key(self, key) -> bool:
         # Механизм устаревания не используется
         if self.expired_timeout == 0:
             return False
@@ -89,12 +124,12 @@ class MemoryCache(BaseCache):
             # Используем механизм устаревания
             if key not in self.expire_info or key not in self.data:
                 # Ключа нет в хранилище дат или нет в основном хранилище
-                await self.remove(key)
+                self._remove(key)
                 return False
 
             if self.expire_info[key] < self._now():
                 # Ключ устарел
-                await self.remove(key)
+                self._remove(key)
                 return False
             # Ключ есть и не устарел
             return True
@@ -103,3 +138,35 @@ class MemoryCache(BaseCache):
 
     def _now(self):
         return datetime.now(tz=timezone.utc if self.use_utc else None)
+
+
+class MemorySyncCache(_MemoryCacheMixin, BaseSyncCache):
+    """ Класс, реализующий синхронное хранение данных в памяти. """
+
+    def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
+        return self._set(key, value, expired_timeout)
+
+    def get(self, key: str) -> Any | None:
+        return self._get(key)
+
+    def remove(self, key: str) -> None:
+        return self._remove(key)
+
+    def has_key(self, key) -> bool:
+        return self._has_key(key)
+
+
+class MemoryCache(_MemoryCacheMixin, BaseCache):
+    """ Класс, реализующий асинхронное хранение данных в памяти. """
+
+    async def set(self, key: str, value: Any, expired_timeout: float | None = None) -> None:
+        return self._set(key, value, expired_timeout)
+
+    async def get(self, key: str) -> Any | None:
+        return self._get(key)
+
+    async def remove(self, key: str) -> None:
+        return self._remove(key)
+
+    async def has_key(self, key) -> bool:
+        return self._has_key(key)

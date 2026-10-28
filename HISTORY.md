@@ -1,5 +1,14 @@
 # History
 
+4.0.2
+==================
+
+1. Добавлены синхронные трансформеры: SyncTransformer, SyncTokenTransformer, SyncOAuthTokenTransformer, SyncSetSystemOAuthToken, SyncSetUserOAuthToken, SyncSetBasicAuthorization
+2. Общая логика OAuth трансформеров переиспользуется синхронной и асинхронной реализациями через миксины
+3. Добавлен синхронный кеш MemorySyncCache; базовые классы BaseCache и BaseSyncCache имеют одинаковые сигнатуры методов (различие только в синхронности)
+4. Добавлена синхронная функция execute_token_request в http_misc.requests.utils
+5. send_and_validate поддерживает синхронные сервисы (результат возвращается сразу) и асинхронные (ожидается через await)
+
 4.0.1
 ==================
 
