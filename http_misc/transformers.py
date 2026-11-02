@@ -257,6 +257,9 @@ class OAuthTokenTransformerMixin(ABC):
                     }
                     return self._get_and_cache_token('refresh_token', extended_request=extended_request)
 
+                # refresh_token не выдан — перевыпускаем токен по исходному grant_type
+                return self._get_and_cache_token(self.grant_type)
+
             return data['access_token']
 
         # если токен не найден, то инициализируем токены
@@ -314,6 +317,9 @@ class OAuthTokenTransformer(OAuthTokenTransformerMixin, TokenTransformer, ABC):
                         'refresh_token': refresh_token
                     }
                     return await self._get_and_cache_token('refresh_token', extended_request=extended_request)
+
+                # refresh_token не выдан — перевыпускаем токен по исходному grant_type
+                return await self._get_and_cache_token(self.grant_type)
 
             return data['access_token']
 
