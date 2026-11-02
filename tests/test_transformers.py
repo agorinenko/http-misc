@@ -145,6 +145,98 @@ def test_sync_oauth_token__refresh(mocker):
     )
 
 
+@pytest.mark.parametrize('is_user', (True, False))
+async def test_oauth_token__reissue_on_expired_without_refresh_token(mocker, is_user):
+    """ Истёкший токен без refresh_token перевыпускается по исходному grant_type, а не возвращается протухшим """
+    execute_token_request_mocker = mocker.patch('http_misc.aiohttp.utils.execute_token_request')
+    execute_token_request_mocker.side_effect = [
+        {'access_token': 'REISSUED_TOKEN', 'expires_in': 36000, 'token_type': 'Bearer'}
+    ]
+
+    token_cache = cache.MemoryCache(expired_timeout=None)
+    if is_user:
+        cache_key = 'client_id-user1'
+        grant_type = 'password'
+        extended_token_request = {'username': 'user1', 'password': '123'}
+        transformer = transformers.SetUserOAuthToken(
+            'user1', '123', 'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/',
+            token_cache=token_cache
+        )
+    else:
+        cache_key = 'client_id'
+        grant_type = 'client_credentials'
+        extended_token_request = {}
+        transformer = transformers.SetSystemOAuthToken(
+            'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/', token_cache=token_cache
+        )
+
+    await token_cache.set(cache_key, {
+        'access_token': 'OLD_TOKEN',
+        'expires_in': 36000,
+        'expires_at': datetime(2025, 1, 15, tzinfo=timezone.utc)
+    })
+
+    request = {
+        'method': 'POST',
+        'url': 'https://localhost',
+        'cfg': {'json': {}}
+    }
+    with freeze_time('2025-01-16 12:00:01'):
+        await transformer.modify(**request)
+
+    assert request['cfg']['headers']['Authorization'] == 'Bearer REISSUED_TOKEN'
+    execute_token_request_mocker.assert_called_once_with(
+        'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/',
+        grant_type=grant_type, extended_token_request=extended_token_request
+    )
+
+
+@pytest.mark.parametrize('is_user', (True, False))
+def test_oauth_token__reissue_on_expired_without_refresh_token_sync(mocker, is_user):
+    """ Истёкший токен без refresh_token перевыпускается по исходному grant_type, а не возвращается протухшим (синхронно) """
+    execute_token_request_mocker = mocker.patch('http_misc.requests.utils.execute_token_request')
+    execute_token_request_mocker.side_effect = [
+        {'access_token': 'REISSUED_TOKEN', 'expires_in': 36000, 'token_type': 'Bearer'}
+    ]
+
+    token_cache = cache.MemorySyncCache(expired_timeout=None)
+    if is_user:
+        cache_key = 'client_id-user1'
+        grant_type = 'password'
+        extended_token_request = {'username': 'user1', 'password': '123'}
+        transformer = transformers.SyncSetUserOAuthToken(
+            'user1', '123', 'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/',
+            token_cache=token_cache
+        )
+    else:
+        cache_key = 'client_id'
+        grant_type = 'client_credentials'
+        extended_token_request = {}
+        transformer = transformers.SyncSetSystemOAuthToken(
+            'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/', token_cache=token_cache
+        )
+
+    token_cache.set(cache_key, {
+        'access_token': 'OLD_TOKEN',
+        'expires_in': 36000,
+        'expires_at': datetime(2025, 1, 15, tzinfo=timezone.utc)
+    })
+
+    request = {
+        'method': 'POST',
+        'url': 'https://localhost',
+        'cfg': {'json': {}}
+    }
+    with freeze_time('2025-01-16 12:00:01'):
+        transformer.modify(**request)
+
+    assert request['cfg']['headers']['Authorization'] == 'Bearer REISSUED_TOKEN'
+    execute_token_request_mocker.assert_called_once_with(
+        'client_id', 'secret', 'read write', 'http://localhost/api/v1/oauth/token/',
+        grant_type=grant_type, extended_token_request=extended_token_request
+    )
+
+
 def test_custom_sync_token_transformer():
     """ Базовый SyncTokenTransformer позволяет реализовывать кастомные синхронные трансформеры """
 
